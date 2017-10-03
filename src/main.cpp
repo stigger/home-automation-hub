@@ -1,4 +1,5 @@
 #include <PubSubClient.h>
+#include <IRremote.h>
 #include <SPI.h>
 #include <Ethernet.h>
 #include "RFMxx.h"
@@ -18,6 +19,8 @@ EthernetServer server(2323);
 CC1101 cc1101;
 RFMxx rfm2(7);
 
+IRrecv irrecv(5);
+
 
 class tempStuff {
 public:
@@ -25,6 +28,7 @@ public:
     float lastTemp = -1;
 };
 
+decode_results results;
 tempStuff sensors[4];
 boolean check_cc1101;
 boolean check_rfm69;
@@ -39,6 +43,8 @@ void rfm69_asserted() {
 
 void setup() {
   Serial.begin(57600);
+
+  irrecv.enableIRIn();
 
   cc1101.init();
   rfm2.InitializeLaCrosse();
@@ -178,6 +184,14 @@ void loop() {
     if (rfm2.PayloadIsReady()) {
       HandleReceivedLaCrosseData(&rfm2);
     }
+  }
+
+  if (irrecv.decode(&results)) {
+    if (mqttClient.connected()) {
+      String value(results.value, 16);
+      mqttClient.publish("ir_sensor", value.c_str());
+    }
+    irrecv.resume();
   }
 
   if (EthernetClient client = server.available()) {
