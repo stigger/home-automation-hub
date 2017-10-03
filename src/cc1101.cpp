@@ -213,6 +213,8 @@ void CC1101::reset(void)
   setCCregs();                          // Reconfigure CC1101
   cmdStrobe(CC1101_SCAL);
   delay(4);
+  cmdStrobe(CC1101_SIDLE);
+  cmdStrobe(CC1101_SFRX);
   cmdStrobe(CC1101_SRX);
 }
 
@@ -241,7 +243,7 @@ void CC1101::setCCregs(void)
 void CC1101::init()
 {
   SPI.begin();                          // Initialize SPI interface
-  pinMode(CC1101_GDO2, INPUT);          // Config GDO0 as input
+//  pinMode(CC1101_GDO2, INPUT);          // Config GDO0 as input
   pinMode(CC1101_SS, OUTPUT);
 
   reset();                              // Reset CC1101
@@ -344,11 +346,6 @@ byte CC1101::receiveData(CCPACKET * packet)
   }
   else {
     packet->length = 0;
-    if (readStatusReg(CC1101_MARCSTATE) == MARCSTATE_RXFIFO_OVERFLOW) {
-      cmdStrobe(CC1101_SFRX);
-      cmdStrobe(CC1101_SIDLE);
-      cmdStrobe(CC1101_SRX);
-    }
   }
   return packet->length;
 }

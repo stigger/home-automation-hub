@@ -15,7 +15,6 @@ PubSubClient mqttClient(mqttEthClient);
 
 EthernetServer server(2323);
 
-//RFMxx rfm1(8);
 CC1101 cc1101;
 RFMxx rfm2(7);
 
@@ -27,21 +26,28 @@ public:
 };
 
 tempStuff sensors[4];
+boolean check_cc1101;
+boolean check_rfm69;
+
+void cc1101_asserted() {
+  check_cc1101 = true;
+}
+
+void rfm69_asserted() {
+  check_rfm69 = true;
+}
 
 void setup() {
   Serial.begin(57600);
 
-//  rfm1.InitializeMoritz();
   cc1101.init();
   rfm2.InitializeLaCrosse();
-//  Serial.println(rfm1.IsConnected());
   Serial.print(F("CC1101_PARTNUM "));
   Serial.println(cc1101.readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER));
   Serial.print(F("CC1101_VERSION "));
   Serial.println(cc1101.readReg(CC1101_VERSION, CC1101_STATUS_REGISTER));
   Serial.println(rfm2.IsConnected());
 
-//  rfm1.EnableReceiver(true);
   rfm2.EnableReceiver(true);
 
   mqttClient.setServer(mqttServer, 1883);
@@ -49,35 +55,15 @@ void setup() {
   Ethernet.begin(mac);
   delay(1500);
   Serial.println(Ethernet.localIP());
-}
 
-//void HandleReceivedMAXData(RFMxx *rfm) {
-//  rfm->EnableReceiver(false);
-//
-//  byte payload[PAYLOADSIZE];
-//  rfm->GetPayload(payload);
-//
-//  size_t len = (payload[0] ^ 0xFF);
-//  xor_pn9(payload, len + 3); // 1 len, 2 crc
-//
-//  uint16_t crc = calc_cc1101_crc(payload, len + 1);
-//  if ((payload[len + 1] == (crc >> 8) && payload[len + 2] == (crc & 0xFF))) {
-//    String message('Z');
-//    for (size_t i = 0; i < len + 1; i++) {
-//      char tmp[5];
-//      sprintf(tmp, "%02X", payload[i]);
-//      message += tmp;
-//    }
-//    byte rssi = rfm->ReadRSSI() >> 1;
-//    rssi = (-1 * rssi + 74) << 1;
-//    String rssiString = String(rssi, HEX);
-//    rssiString.toUpperCase();
-//    message += rssiString;
-//    message += '\n';
-//    server.write(message.c_str());
-//  }
-//  rfm->EnableReceiver(true);
-//}
+  check_cc1101 = false;
+  pinMode(2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(2), cc1101_asserted, RISING);
+
+  check_rfm69 = false;
+  pinMode(3, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(3), rfm69_asserted, RISING);
+}
 
 void HandleReceivedMAXData(CC1101 *r) {
   CCPACKET packet;
@@ -97,35 +83,6 @@ void HandleReceivedMAXData(CC1101 *r) {
     server.write(message.c_str());
   }
 }
-
-//void SendMAXData(char const *buf, RFMxx *rfm) {
-//  byte enc[50];
-//  boolean fast;
-//  if (buf[1] == 's' || buf[1] == 'f') {
-//    fast = buf[1] == 'f';
-//  }
-//  else {
-//    return;
-//  }
-//
-//  fromhex(buf + 2, enc, sizeof(enc) - 3);
-//  size_t len = enc[0];
-//
-//  uint16_t crc = calc_cc1101_crc(enc, len + 1);
-//
-//  enc[len + 1] = (byte) ((crc >> 8) & 0xFF);
-//  enc[len + 2] = (byte) (crc & 0xFF);
-//
-//  xor_pn9(enc, len + 3);
-//
-//
-//  rfm->EnableTransmitter(true);
-//  if (!fast) {
-//    delay(1000);
-//  }
-//  rfm->SendArray(enc, len + 3);
-//  rfm->EnableReceiver(true);
-//}
 
 void SendMAXData(char const *buf, CC1101 *radio) {
   byte enc[50];
@@ -210,15 +167,17 @@ void mqttReconnect() {
 }
 
 void loop() {
-  HandleReceivedMAXData(&cc1101);
-//  rfm1.Receive();
-//  if (rfm1.PayloadIsReady()) {
-//    HandleReceivedMAXData(&rfm1);
-//  }
+  if (check_cc1101) {
+    check_cc1101 = false;
+    HandleReceivedMAXData(&cc1101);
+  }
 
-  rfm2.Receive();
-  if (rfm2.PayloadIsReady()) {
-    HandleReceivedLaCrosseData(&rfm2);
+  if (check_rfm69) {
+    check_rfm69 = false;
+    rfm2.Receive();
+    if (rfm2.PayloadIsReady()) {
+      HandleReceivedLaCrosseData(&rfm2);
+    }
   }
 
   if (EthernetClient client = server.available()) {
@@ -226,7 +185,6 @@ void loop() {
     int read = client.read((uint8_t *) buf, sizeof(buf));
     if (read > 0) {
       if (buf[0] != 'Z') return;
-//      SendMAXData(buf, &rfm1);
       SendMAXData(buf, &cc1101);
     }
   }

@@ -3,7 +3,7 @@
 
 #include "Arduino.h"
 
-#define PAYLOADSIZE 64
+#define PAYLOADSIZE 5
 
 
 class RFMxx {
