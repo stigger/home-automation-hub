@@ -29,7 +29,7 @@ public:
 };
 
 decode_results results;
-tempStuff sensors[4];
+tempStuff sensors[5];
 boolean check_cc1101;
 boolean check_rfm69;
 
