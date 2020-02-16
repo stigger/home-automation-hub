@@ -1,3 +1,6 @@
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "cert-err58-cpp"
+#pragma ide diagnostic ignored "readability-static-accessed-through-instance"
 #include <PubSubClient.h>
 #include <IRremote.h>
 #include <SPI.h>
@@ -5,6 +8,8 @@
 #include "RFMxx.h"
 #include "util.h"
 #include "LaCrosse.h"
+
+#define NRF_SS 8
 
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
@@ -23,9 +28,18 @@ public:
     float lastTemp = -1;
 };
 
+void mqttCallback(char *, uint8_t *payload, unsigned int length) {
+  if (length == 1) {
+    digitalWrite(NRF_SS, LOW);
+    SPI.transfer(payload[0]);
+    digitalWrite(NRF_SS, HIGH);
+  }
+}
+
 decode_results results;
 tempStuff sensors[5];
 boolean check_rfm69;
+boolean mqtt_subscribed;
 
 void rfm69_asserted() {
   check_rfm69 = true;
@@ -33,6 +47,7 @@ void rfm69_asserted() {
 
 void setup() {
   Serial.begin(57600);
+  pinMode(NRF_SS, OUTPUT);
 
   irrecv.enableIRIn();
 
@@ -41,11 +56,12 @@ void setup() {
 
   rfm2.EnableReceiver(true);
 
-  mqttClient.setServer(mqttServer, 1883);
-
   Ethernet.begin(mac);
   delay(1500);
   Serial.println(Ethernet.localIP());
+
+  mqttClient.setServer(mqttServer, 1883);
+  mqttClient.setCallback(&mqttCallback);
 
   check_rfm69 = false;
   pinMode(3, INPUT_PULLUP);
@@ -138,7 +154,11 @@ void loop() {
   }
 
   if (!mqttClient.connected()) {
+    mqtt_subscribed = false;
     mqttReconnect();
+  }
+  else if (!mqtt_subscribed) {
+    mqtt_subscribed = mqttClient.subscribe("arduinoHub/lights");
   }
   mqttClient.loop();
 
