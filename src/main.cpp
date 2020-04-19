@@ -9,7 +9,7 @@
 #include "util.h"
 #include "LaCrosse.h"
 
-#define NRF_SS 8
+#define NRF_SS 19
 
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
@@ -17,9 +17,9 @@ IPAddress mqttServer(192, 168, 132, 243);
 EthernetClient mqttEthClient;
 PubSubClient mqttClient(mqttEthClient);
 
-RFMxx rfm2(7);
+RFMxx rfm2(6);
 
-IRrecv irrecv(5);
+IRrecv irrecv(1);
 
 
 class tempStuff {
@@ -46,19 +46,20 @@ void rfm69_asserted() {
 }
 
 void setup() {
-  Serial.begin(57600);
+  // serial currently conflicts with IR on pin 1
+//  Serial.begin(57600);
   pinMode(NRF_SS, OUTPUT);
 
   irrecv.enableIRIn();
 
   rfm2.InitializeLaCrosse();
-  Serial.println(rfm2.IsConnected());
+//  Serial.println(rfm2.IsConnected());
 
   rfm2.EnableReceiver(true);
 
   Ethernet.begin(mac);
   delay(1500);
-  Serial.println(Ethernet.localIP());
+//  Serial.println(Ethernet.localIP());
 
   mqttClient.setServer(mqttServer, 1883);
   mqttClient.setCallback(&mqttCallback);
@@ -86,7 +87,7 @@ void HandleReceivedLaCrosseData(RFMxx *rfm) {
       }
     }
     if (stuff == nullptr) {
-      Serial.println("sensors overflow");
+//      Serial.println("sensors overflow");
     }
     else {
       if (stuff->lastTemp == -1 || fabs(stuff->lastTemp - frame.Temperature) < 5) {
@@ -131,7 +132,7 @@ void HandleReceivedLaCrosseData(RFMxx *rfm) {
 
 void mqttReconnect() {
   if (!mqttClient.connect("arduinoClient")) {
-    Serial.print("mqtt reconnect failed");
+//    Serial.print("mqtt reconnect failed");
     delay(1000);
   }
 }
