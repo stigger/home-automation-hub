@@ -8,6 +8,7 @@
 #include "RFMxx.h"
 #include "util.h"
 #include "LaCrosse.h"
+#include "cc1101.h"
 
 #define NRF_SS 19
 
@@ -18,6 +19,7 @@ EthernetClient mqttEthClient;
 PubSubClient mqttClient(mqttEthClient);
 
 RFMxx rfm2(6);
+CC1101 cc1101;
 
 IRrecv irrecv(1);
 
@@ -28,11 +30,24 @@ public:
     float lastTemp = -1;
 };
 
+uint8_t prev_lights_state;
+//  byte unknown_sent_right_after_rf_init[16] {0x0e, 0x68, 0x04, 0x1f, 0x46, 0x50, 0xa7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xaa, 0x16, 0xff};
+const byte off[16] {0x0e, 0x68, 0x04, 0x1f, 0x46, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5f, 0x16, 0xff};
+const byte on[16] {0x0e, 0x68, 0x04, 0x1f, 0x46, 0x01, 0xa7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb, 0x16, 0xff};
+
 void mqttCallback(char *, uint8_t *payload, unsigned int length) {
   if (length == 1) {
+    uint8_t data = payload[0];
+    if ((prev_lights_state & 0b100u) != (data & 0b100u)) {
+      for (int i = 0; i < 5; i++) {
+        cc1101.sendData((data & 0b100u) != 0 ? on : off, false);
+        delay(30);
+      }
+    }
     digitalWrite(NRF_SS, LOW);
-    SPI.transfer(payload[0]);
+    SPI.transfer(data);
     digitalWrite(NRF_SS, HIGH);
+    prev_lights_state = data;
   }
 }
 
@@ -51,6 +66,12 @@ void setup() {
   pinMode(NRF_SS, OUTPUT);
 
   irrecv.enableIRIn();
+
+  cc1101.init();
+//  Serial.print(F("CC2500_PARTNUM "));
+//  Serial.println(cc1101.readReg(CC1101_PARTNUM, CC1101_STATUS_REGISTER));
+//  Serial.print(F("CC2500_VERSION "));
+//  Serial.println(cc1101.readReg(CC1101_VERSION, CC1101_STATUS_REGISTER));
 
   rfm2.InitializeLaCrosse();
 //  Serial.println(rfm2.IsConnected());
