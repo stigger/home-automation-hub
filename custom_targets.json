@@ -1,0 +1,122 @@
+{
+  "MCU_NRF52811": {
+    "inherits": [
+      "Target"
+    ],
+    "core": "Cortex-M4",
+    "macros": [
+      "BOARD_PCA10040",
+      "NRF52_SERIES",
+      "NRF52811",
+      "NRF52811_XXAA",
+      "TARGET_NRF52811",
+      "CMSIS_VECTAB_VIRTUAL",
+      "CMSIS_VECTAB_VIRTUAL_HEADER_FILE=\"cmsis_nvic.h\"",
+      "MBED_TICKLESS",
+      "MBED_MPU_CUSTOM",
+      "SWI_DISABLE0"
+    ],
+    "features": [
+      "BLE"
+    ],
+    "device_has": [
+      "ANALOGIN",
+      "FLASH",
+      "I2C",
+      "I2C_ASYNCH",
+      "I2CSLAVE",
+      "INTERRUPTIN",
+      "ITM",
+      "LPTICKER",
+      "PORTIN",
+      "PORTINOUT",
+      "PORTOUT",
+      "PWMOUT",
+      "SERIAL",
+      "SERIAL_ASYNCH",
+      "SERIAL_FC",
+      "SLEEP",
+      "SPI",
+      "SPI_ASYNCH",
+      "SYSTICK_CLK_OFF_DURING_SLEEP",
+      "TRNG",
+      "USTICKER"
+    ],
+    "extra_labels": [
+      "NORDIC",
+      "NRF5x",
+      "NRF52",
+      "SDK_15_0",
+      "CORDIO",
+      "CORDIO_LL",
+      "SOFTDEVICE_NONE",
+      "NORDIC_CORDIO"
+    ],
+    "config": {
+      "lf_clock_src": {
+        "macro_name": "MBED_CONF_NORDIC_NRF_LF_CLOCK_SRC",
+        "help": "Select Low Frequency clock source. Options: NRF_LF_SRC_XTAL, NRF_LF_SRC_SYNTH, and NRF_LF_SRC_RC",
+        "value": "NRF_LF_SRC_XTAL"
+      },
+      "lf_clock_rc_calib_timer_interval": {
+        "macro_name": "MBED_CONF_NORDIC_NRF_LF_CLOCK_CALIB_TIMER_INTERVAL",
+        "value": 16
+      },
+      "lf_clock_rc_calib_mode_config": {
+        "macro_name": "MBED_CONF_NORDIC_NRF_LF_CLOCK_CALIB_MODE_CONFIG",
+        "value": 0
+      },
+      "uart_0_fifo_size": {
+        "help": "UART0 FIFO buffer. FIFO buffer is filled from DMA buffer.",
+        "value": 32
+      },
+      "uart_1_fifo_size": {
+        "help": "UART1 FIFO buffer. FIFO buffer is filled from DMA buffer.",
+        "value": 32
+      }
+    },
+    "OUTPUT_EXT": "hex",
+    "is_disk_virtual": true,
+    "supported_toolchains": [
+      "GCC_ARM",
+      "ARM",
+      "IAR"
+    ],
+    "public": false,
+    "detect_code": [
+      "1101"
+    ],
+    "program_cycle_s": 6,
+    "bootloader_supported": true
+  },
+  "NRF52_MY": {
+    "inherits": [
+      "MCU_NRF52811"
+    ],
+    "release_versions": [
+      "5"
+    ],
+    "overrides": {
+      "lf_clock_src": "NRF_LF_SRC_SYNTH"
+    },
+    "device_name": "nRF52811_xxAA",
+    "device_has_remove": [
+      "ITM"
+    ],
+    "macros_add": [
+      "WSF_MAX_HANDLERS=10",
+      "CONFIG_GPIO_AS_PINRESET",
+      "NRF52_PAN_15",
+      "NRF52_PAN_20",
+      "NRF52_PAN_31",
+      "NRF52_PAN_36",
+      "NRF52_PAN_66",
+      "NRF52_PAN_136",
+      "NRF52_PAN_217",
+      "NRF52_PAN_217"
+    ],
+    "detect_code": [
+      "1102"
+    ]
+  }
+}

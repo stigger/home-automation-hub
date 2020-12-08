@@ -1,0 +1,14 @@
+{
+  "macros": [
+    "_N_D_EBUG=1"
+  ],
+  "target_overrides": {
+    "*": {
+      "target.lf_clock_src": "NRF_LF_SRC_SYNTH",
+      "rtos.thread-stack-size": 2048,
+      "platform.heap-stats-enabled": true,
+      "events.shared-dispatch-from-application": true,
+      "platform.error-filename-capture-enabled": true
+    }
+  }
+}
