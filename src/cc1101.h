@@ -26,7 +26,6 @@
 #ifndef _CC1101_H
 #define _CC1101_H
 
-#include <Arduino.h>
 #include <SPI.h>
 #include "ccpacket.h"
 
@@ -297,7 +296,7 @@
 class CC1101
 {
   private:
-    unsigned long lastSendingMillis;
+    mbed::SPI SPI;
     /**
      * writeBurstReg
      * 
@@ -336,7 +335,7 @@ public:
      * 
      * 'cmd'	Command strobe
      */
-    byte cmdStrobe(uint8_t cmd);
+    uint8_t cmdStrobe(uint8_t cmd);
 
     /**
      * readReg
@@ -385,7 +384,7 @@ public:
      */
     void init();
 
-    bool sendData(const byte *data, bool longPreamble);
+    bool sendData(const uint8_t *data, bool longPreamble);
 
     /**
      * receiveData
@@ -397,7 +396,7 @@ public:
      */
     uint8_t receiveData(CCPACKET *packet);
 
-    void writeBurstReg(byte regAddr, byte const *buffer, byte len);
+    void writeBurstReg(uint8_t regAddr, uint8_t const *buffer, uint8_t len);
 };
 
 #endif

@@ -44,12 +44,12 @@ struct CCPACKET
     /**
      * Data length
      */
-    byte length;
+    uint8_t length;
 
     /**
      * Data buffer
      */
-    byte data[CCPACKET_DATA_LEN];
+    uint8_t data[CCPACKET_DATA_LEN];
 
     /**
      * CRC OK flag
@@ -59,12 +59,12 @@ struct CCPACKET
     /**
      * Received Strength Signal Indication
      */
-    byte rssi;
+    uint8_t rssi;
 
     /**
      * Link Quality Index
      */
-    byte lqi;
+    uint8_t lqi;
 };
 
 #endif

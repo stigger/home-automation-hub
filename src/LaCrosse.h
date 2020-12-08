@@ -1,27 +1,26 @@
 #ifndef _LACROSSE_h
 #define _LACROSSE_h
 
-#include "Arduino.h"
-
+#include <cstdint>
 
 class LaCrosse {
 public:
   struct Frame {
-    byte  Header;
-    byte  ID;
+    uint8_t  Header;
+    uint8_t  ID;
     bool  NewBatteryFlag;
     bool  Bit12;
     float Temperature;
     bool  WeakBatteryFlag;
-    byte  Humidity;
-    byte  CRC;
+    uint8_t  Humidity;
+    uint8_t  CRC;
     bool  IsValid;
   };
 
-  static const byte FRAME_LENGTH = 5;
-  static byte CalculateCRC(byte data[]);
+  static const uint8_t FRAME_LENGTH = 5;
+  static uint8_t CalculateCRC(const uint8_t data[]);
 
-  static void DecodeFrame(byte *bytes, struct LaCrosse::Frame *frame);
+  static void DecodeFrame(uint8_t *bytes, struct LaCrosse::Frame *frame);
 };
 
 #endif

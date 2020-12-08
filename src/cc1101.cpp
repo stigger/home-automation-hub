@@ -24,20 +24,20 @@
  */
 
 #include "cc1101.h"
-
+#include <mbed.h>
 /**
  * Macros
  */
-#define CC1101_SS 18
+
+DigitalOut CC1101_SS(p18);
 // Select (SPI) CC1101
-#define cc1101_Select()  digitalWrite(CC1101_SS, LOW)
+#define cc1101_Select()  CC1101_SS = 0
 // Deselect (SPI) CC1101
-#define cc1101_Deselect()  digitalWrite(CC1101_SS, HIGH)
+#define cc1101_Deselect()  CC1101_SS = 1
 // Wait until SPI MISO line goes low
-#define wait_Miso()  while(digitalRead(MISO)>0)
 #define getGDO2state()  digitalRead(CC1101_GDO2)
 
-const uint8_t PROGMEM LIGHT_CFG[89] = {
+const uint8_t LIGHT_CFG[89] = {
         0x02, 0x06, //IOCFG0
         0x03, 0x07,
         0x04, 0xD3, //SYNC1
@@ -122,9 +122,8 @@ const uint8_t PROGMEM LIGHT_CFG[89] = {
  * 
  * Class constructor
  */
-CC1101::CC1101()
+CC1101::CC1101(): SPI(SPI_PSELMOSI0, SPI_PSELMISO0, SPI_PSELSCK0)
 {
-  lastSendingMillis = 0;
 }
 
 /**
@@ -135,12 +134,11 @@ CC1101::CC1101()
  * 'regAddr'	Register address
  * 'value'	Value to be writen
  */
-void CC1101::writeReg(byte regAddr, byte value) 
+void CC1101::writeReg(uint8_t regAddr, uint8_t value)
 {
   cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  SPI.transfer(regAddr);                // Send register address
-  SPI.transfer(value);                  // Send value
+  SPI.write(regAddr);                // Send register address
+  SPI.write(value);                  // Send value
   cc1101_Deselect();                    // Deselect CC1101
 }
 
@@ -153,17 +151,16 @@ void CC1101::writeReg(byte regAddr, byte value)
  * 'buffer'	Data to be writen
  * 'len'	Data length
  */
-void CC1101::writeBurstReg(byte regAddr, const byte* buffer, byte len)
+void CC1101::writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len)
 {
-  byte addr, i;
+  uint8_t addr, i;
   
   addr = regAddr | WRITE_BURST;         // Enable burst transfer
   cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  SPI.transfer(addr);                   // Send register address
+  SPI.write(addr);                   // Send register address
   
   for(i=0 ; i<len ; i++)
-    SPI.transfer(buffer[i]);            // Send value
+    SPI.write(buffer[i]);            // Send value
 
   cc1101_Deselect();                    // Deselect CC1101  
 }
@@ -174,17 +171,16 @@ void CC1101::writeBurstReg(byte regAddr, const byte* buffer, byte len)
  * Send command strobe to the CC1101 IC via SPI
  * 
  * 'cmd'	Command strobe
- */     
-byte CC1101::cmdStrobe(byte cmd)
+ */
+uint8_t CC1101::cmdStrobe(uint8_t cmd)
 {
-  byte res = 0;
+  uint8_t res = 0;
   for (int i = 0; i < 5; i++) {
     cc1101_Select();                      // Select CC1101
-    wait_Miso();                          // Wait until MISO goes low
-    res = SPI.transfer(cmd);              // Send strobe command
+    res = SPI.write(cmd);              // Send strobe command
     cc1101_Deselect();                    // Deselect CC1101
     if (!(res & CC1100_STATUS_CHIP_RDYn_BM)) break;
-    delayMicroseconds(20);
+    wait_us(20);
   }
   return res;
 }
@@ -200,15 +196,14 @@ byte CC1101::cmdStrobe(byte cmd)
  * Return:
  * 	Data byte returned by the CC1101 IC
  */
-byte CC1101::readReg(byte regAddr, byte regType)
+uint8_t CC1101::readReg(uint8_t regAddr, uint8_t regType)
 {
-  byte addr, val;
+  uint8_t addr, val;
 
   addr = regAddr | regType;
   cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  SPI.transfer(addr);                   // Send register address
-  val = SPI.transfer(0x00);             // Read result
+  SPI.write(addr);                   // Send register address
+  val = SPI.write(0x00);             // Read result
   cc1101_Deselect();                    // Deselect CC1101
 
   return val;
@@ -223,16 +218,15 @@ byte CC1101::readReg(byte regAddr, byte regType)
  * 'regAddr'	Register address
  * 'len'	Data length
  */
-void CC1101::readBurstReg(byte * buffer, byte regAddr, byte len) 
+void CC1101::readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len)
 {
-  byte addr, i;
+  uint8_t addr, i;
   
   addr = regAddr | READ_BURST;
   cc1101_Select();                      // Select CC1101
-  wait_Miso();                          // Wait until MISO goes low
-  SPI.transfer(addr);                   // Send register address
+  SPI.write(addr);                   // Send register address
   for(i=0 ; i<len ; i++)
-    buffer[i] = SPI.transfer(0x00);     // Read result byte by byte
+    buffer[i] = SPI.write(0x00);     // Read result byte by byte
   cc1101_Deselect();                    // Deselect CC1101
 }
 
@@ -244,22 +238,20 @@ void CC1101::readBurstReg(byte * buffer, byte regAddr, byte len)
 void CC1101::reset(void) 
 {
   cc1101_Deselect();                    // Deselect CC1101
-  delayMicroseconds(5);
+  wait_us(5);
   cc1101_Select();                      // Select CC1101
-  delayMicroseconds(10);
+  wait_us(10);
   cc1101_Deselect();                    // Deselect CC1101
-  delayMicroseconds(41);
+  wait_us(41);
   cc1101_Select();                      // Select CC1101
 
-  wait_Miso();                          // Wait until MISO goes low
-  SPI.transfer(CC1101_SRES);            // Send reset command strobe
-  wait_Miso();                          // Wait until MISO goes low
+  SPI.write(CC1101_SRES);            // Send reset command strobe
 
   cc1101_Deselect();                    // Deselect CC1101
 
   setCCregs();                          // Reconfigure CC1101
   cmdStrobe(CC1101_SCAL);
-  delay(4);
+  ThisThread::sleep_for(4ms);
   cmdStrobe(CC1101_SIDLE);
   cmdStrobe(CC1101_SFRX);
   cmdStrobe(CC1101_SRX);
@@ -273,9 +265,9 @@ void CC1101::reset(void)
 void CC1101::setCCregs(void) 
 {
   for (uint8_t i = 0; i<90; i += 2) {
-    if (pgm_read_byte( &LIGHT_CFG[i] )>0x40)
+    if (LIGHT_CFG[i]>0x40)
       break;
-    writeReg(pgm_read_byte(&LIGHT_CFG[i]), pgm_read_byte(&LIGHT_CFG[i+1]));
+    writeReg(LIGHT_CFG[i], LIGHT_CFG[i+1]);
   }
 }
 
@@ -289,9 +281,8 @@ void CC1101::setCCregs(void)
  */
 void CC1101::init()
 {
-  SPI.begin();                          // Initialize SPI interface
+  SPI.format(8);                          // Initialize SPI interface
 //  pinMode(CC1101_GDO2, INPUT);          // Config GDO0 as input
-  pinMode(CC1101_SS, OUTPUT);
 
   reset();                              // Reset CC1101
 }
@@ -307,7 +298,7 @@ void CC1101::init()
  *    True if the transmission succeeds
  *    False otherwise
  */
-bool CC1101::sendData(const byte *data, bool longPreamble)
+bool CC1101::sendData(const uint8_t *data, bool longPreamble)
 {
 //  if (readStatusReg(CC1101_MARCSTATE) != MARCSTATE_RX) {
 //    Serial.println("cc1101 error1");
@@ -339,7 +330,7 @@ bool CC1101::sendData(const byte *data, bool longPreamble)
 //  }
 
   if (longPreamble) {
-    delay(1000);
+    ThisThread::sleep_for(1s);
   }
 
   writeBurstReg(CC1101_TXFIFO, data, 16);
@@ -362,8 +353,6 @@ bool CC1101::sendData(const byte *data, bool longPreamble)
 //    return false;
 //  }
 
-  lastSendingMillis = millis();
-
   return true;
 }
 
@@ -377,7 +366,7 @@ bool CC1101::sendData(const byte *data, bool longPreamble)
  * Return:
  * 	Amount of bytes received
  */
-byte CC1101::receiveData(CCPACKET * packet)
+uint8_t CC1101::receiveData(CCPACKET * packet)
 {
 //  if (getGDO2state()) {
     packet->length = readConfigReg(CC1101_RXFIFO) & 0x7f;
@@ -386,10 +375,6 @@ byte CC1101::receiveData(CCPACKET * packet)
     }
     else {
       readBurstReg(packet->data, CC1101_RXFIFO, packet->length);
-      packet->rssi = readConfigReg(CC1101_RXFIFO);
-      byte val = readConfigReg(CC1101_RXFIFO);
-      packet->lqi = val & 0x7F;
-      packet->crc_ok = bitRead(val, 7) != 0;
     }
 //  }
 //  else {

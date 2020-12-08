@@ -23,13 +23,13 @@
 *
 */
 
-byte LaCrosse::CalculateCRC(byte data[]) {
+uint8_t LaCrosse::CalculateCRC(const uint8_t data[]) {
   int i, j;
-  byte res = 0;
+  uint8_t res = 0;
   for (j = 0; j < FRAME_LENGTH - 1; j++) {
     uint8_t val = data[j];
     for (i = 0; i < 8; i++) {
-      uint8_t tmp = (uint8_t)((res ^ val) & 0x80);
+      auto tmp = (uint8_t)((res ^ val) & 0x80);
       res <<= 1;
       if (0 != tmp) {
         res ^= 0x31;
@@ -40,7 +40,7 @@ byte LaCrosse::CalculateCRC(byte data[]) {
   return res;
 }
 
-void LaCrosse::DecodeFrame(byte *bytes, struct Frame *frame) {
+void LaCrosse::DecodeFrame(uint8_t *bytes, struct Frame *frame) {
   frame->IsValid = true;
 
   frame->CRC = bytes[4];
@@ -63,7 +63,7 @@ void LaCrosse::DecodeFrame(byte *bytes, struct Frame *frame) {
 
   frame->Bit12 = (bytes[1] & 0x10) >> 4;
 
-  byte bcd[3];
+  uint8_t bcd[3];
   bcd[0] = bytes[1] & 0xF;
   bcd[1] = (bytes[2] & 0xF0) >> 4;
   bcd[2] = (bytes[2] & 0xF);
