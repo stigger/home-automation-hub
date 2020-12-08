@@ -25,16 +25,10 @@
 
 #include "cc1101.h"
 #include <mbed.h>
-/**
- * Macros
- */
 
 DigitalOut CC1101_SS(p18);
-// Select (SPI) CC1101
 #define cc1101_Select()  CC1101_SS = 0
-// Deselect (SPI) CC1101
 #define cc1101_Deselect()  CC1101_SS = 1
-// Wait until SPI MISO line goes low
 #define getGDO2state()  digitalRead(CC1101_GDO2)
 
 const uint8_t LIGHT_CFG[89] = {
@@ -117,23 +111,10 @@ const uint8_t LIGHT_CFG[89] = {
 //        0xff
 //};
 
-/**
- * CC1101
- * 
- * Class constructor
- */
 CC1101::CC1101(): SPI(SPI_PSELMOSI0, SPI_PSELMISO0, SPI_PSELSCK0)
 {
 }
 
-/**
- * writeReg
- * 
- * Write single register into the CC1101 IC via SPI
- * 
- * 'regAddr'	Register address
- * 'value'	Value to be writen
- */
 void CC1101::writeReg(uint8_t regAddr, uint8_t value)
 {
   cc1101_Select();                      // Select CC1101
@@ -142,15 +123,6 @@ void CC1101::writeReg(uint8_t regAddr, uint8_t value)
   cc1101_Deselect();                    // Deselect CC1101
 }
 
-/**
- * writeBurstReg
- * 
- * Write multiple registers into the CC1101 IC via SPI
- * 
- * 'regAddr'	Register address
- * 'buffer'	Data to be writen
- * 'len'	Data length
- */
 void CC1101::writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len)
 {
   uint8_t addr, i;
@@ -165,13 +137,6 @@ void CC1101::writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len)
   cc1101_Deselect();                    // Deselect CC1101  
 }
 
-/**
- * cmdStrobe
- * 
- * Send command strobe to the CC1101 IC via SPI
- * 
- * 'cmd'	Command strobe
- */
 uint8_t CC1101::cmdStrobe(uint8_t cmd)
 {
   uint8_t res = 0;
@@ -185,17 +150,6 @@ uint8_t CC1101::cmdStrobe(uint8_t cmd)
   return res;
 }
 
-/**
- * readReg
- * 
- * Read CC1101 register via SPI
- * 
- * 'regAddr'	Register address
- * 'regType'	Type of register: CC1101_CONFIG_REGISTER or CC1101_STATUS_REGISTER
- * 
- * Return:
- * 	Data byte returned by the CC1101 IC
- */
 uint8_t CC1101::readReg(uint8_t regAddr, uint8_t regType)
 {
   uint8_t addr, val;
@@ -209,15 +163,6 @@ uint8_t CC1101::readReg(uint8_t regAddr, uint8_t regType)
   return val;
 }
 
-/**
- * readBurstReg
- * 
- * Read burst data from CC1101 via SPI
- * 
- * 'buffer'	Buffer where to copy the result to
- * 'regAddr'	Register address
- * 'len'	Data length
- */
 void CC1101::readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len)
 {
   uint8_t addr, i;
@@ -230,12 +175,7 @@ void CC1101::readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len)
   cc1101_Deselect();                    // Deselect CC1101
 }
 
-/**
- * reset
- * 
- * Reset CC1101
- */
-void CC1101::reset(void) 
+void CC1101::reset()
 {
   cc1101_Deselect();                    // Deselect CC1101
   wait_us(5);
@@ -257,12 +197,7 @@ void CC1101::reset(void)
   cmdStrobe(CC1101_SRX);
 }
 
-/**
- * setCCregs
- * 
- * Configure CC1101 registers
- */
-void CC1101::setCCregs(void) 
+void CC1101::setCCregs()
 {
   for (uint8_t i = 0; i<90; i += 2) {
     if (LIGHT_CFG[i]>0x40)
@@ -271,14 +206,6 @@ void CC1101::setCCregs(void)
   }
 }
 
-/**
- * init
- * 
- * Initialize CC1101 radio
- *
- * @param freq Carrier frequency
- * @param mode Working mode (speed, ...)
- */
 void CC1101::init()
 {
   SPI.format(8);                          // Initialize SPI interface
@@ -287,17 +214,6 @@ void CC1101::init()
   reset();                              // Reset CC1101
 }
 
-/**
- * sendData
- * 
- * Send data packet via RF
- * 
- * 'packet'	Packet to be transmitted. First byte is the destination address
- *
- *  Return:
- *    True if the transmission succeeds
- *    False otherwise
- */
 bool CC1101::sendData(const uint8_t *data, bool longPreamble)
 {
 //  if (readStatusReg(CC1101_MARCSTATE) != MARCSTATE_RX) {
@@ -356,16 +272,6 @@ bool CC1101::sendData(const uint8_t *data, bool longPreamble)
   return true;
 }
 
-/**
- * receiveData
- * 
- * Read data packet from RX FIFO
- *
- * 'packet'	Container for the packet received
- * 
- * Return:
- * 	Amount of bytes received
- */
 uint8_t CC1101::receiveData(CCPACKET * packet)
 {
 //  if (getGDO2state()) {

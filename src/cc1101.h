@@ -29,10 +29,6 @@
 #include <SPI.h>
 #include "ccpacket.h"
 
-#define EE_CC1100_CFG_SIZE   0x2a
-
-//#define CC1101_GDO2 2   // GDO2 input interrupt pin
-
 /**
  * Type of transfers
  */
@@ -287,116 +283,32 @@
 #define PA_LowPower               0x60
 #define PA_LongDistance           0xC0
 
-/**
- * Class: CC1101
- * 
- * Description:
- * CC1101 interface
- */
 class CC1101
 {
   private:
     mbed::SPI SPI;
-    /**
-     * writeBurstReg
-     * 
-     * Write multiple registers into the CC1101 IC via SPI
-     * 
-     * 'regAddr'	Register address
-     * 'buffer'	Data to be writen
-     * 'len'	Data length
-     */
-    void writeBurstReg(uint8_t regAddr, uint8_t* buffer, uint8_t len);
-
-    /**
-     * readBurstReg
-     * 
-     * Read burst data from CC1101 via SPI
-     * 
-     * 'buffer'	Buffer where to copy the result to
-     * 'regAddr'	Register address
-     * 'len'	Data length
-     */
+    void writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len);
     void readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len);
 
 public:
 
-    /**
-     * CC1101
-     * 
-     * Class constructor
-     */
-    CC1101(void);
+    CC1101();
 
-    /**
-     * cmdStrobe
-     * 
-     * Send command strobe to the CC1101 IC via SPI
-     * 
-     * 'cmd'	Command strobe
-     */
     uint8_t cmdStrobe(uint8_t cmd);
 
-    /**
-     * readReg
-     * 
-     * Read CC1101 register via SPI
-     * 
-     * 'regAddr'	Register address
-     * 'regType'	Type of register: CC1101_CONFIG_REGISTER or CC1101_STATUS_REGISTER
-     * 
-     * Return:
-     * 	Data byte returned by the CC1101 IC
-     */
     uint8_t readReg(uint8_t regAddr, uint8_t regType);
 
-    /**
-     * writeReg
-     * 
-     * Write single register into the CC1101 IC via SPI
-     * 
-     * 'regAddr'	Register address
-     * 'value'	Value to be writen
-     */
     void writeReg(uint8_t regAddr, uint8_t value);
 
-    /**
-     * setCCregs
-     * 
-     * Configure CC1101 registers
-     */
-    void setCCregs(void);
+    void setCCregs();
 
-    /**
-     * reset
-     * 
-     * Reset CC1101
-     */
-    void reset(void);
+    void reset();
     
-    /**
-     * init
-     * 
-     * Initialize CC1101 radio
-     *
-     * @param freq Carrier frequency
-     * @param mode Working mode (speed, ...)
-     */
     void init();
 
     bool sendData(const uint8_t *data, bool longPreamble);
 
-    /**
-     * receiveData
-     * 
-     * Read data packet from RX FIFO
-     * 
-     * Return:
-     * 	Amount of bytes received
-     */
     uint8_t receiveData(CCPACKET *packet);
-
-    void writeBurstReg(uint8_t regAddr, uint8_t const *buffer, uint8_t len);
 };
 
 #endif
