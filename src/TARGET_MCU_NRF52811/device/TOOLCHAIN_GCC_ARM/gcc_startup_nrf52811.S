@@ -47,34 +47,34 @@ __Vectors:
   /* External Interrupts */
     .long   POWER_CLOCK_IRQHandler
     .long   RADIO_IRQHandler
-    .long   UARTE0_UART0_IRQHandler
-    .long   TWIM0_TWIS0_TWI0_SPIM1_SPIS1_SPI1_IRQHandler
-    .long   SPIM0_SPIS0_SPI0_IRQHandler
+    .long   UARTE0_UART0_IRQHandler_v
+    .long   TWIM0_TWIS0_TWI0_SPIM1_SPIS1_SPI1_IRQHandler_v
+    .long   SPIM0_SPIS0_SPI0_IRQHandler_v
     .long   0                           /*Reserved */
-    .long   GPIOTE_IRQHandler
-    .long   SAADC_IRQHandler
-    .long   TIMER0_IRQHandler
-    .long   TIMER1_IRQHandler
-    .long   TIMER2_IRQHandler
+    .long   GPIOTE_IRQHandler_v
+    .long   SAADC_IRQHandler_v
+    .long   TIMER0_IRQHandler_v
+    .long   TIMER1_IRQHandler_v
+    .long   TIMER2_IRQHandler_v
     .long   RTC0_IRQHandler
-    .long   TEMP_IRQHandler
+    .long   TEMP_IRQHandler_v
     .long   RNG_IRQHandler
     .long   ECB_IRQHandler
     .long   CCM_AAR_IRQHandler
-    .long   WDT_IRQHandler
-    .long   RTC1_IRQHandler
-    .long   QDEC_IRQHandler
-    .long   COMP_IRQHandler
-    .long   SWI0_EGU0_IRQHandler
-    .long   SWI1_EGU1_IRQHandler
-    .long   SWI2_IRQHandler
-    .long   SWI3_IRQHandler
+    .long   WDT_IRQHandler_v
+    .long   RTC1_IRQHandler_v
+    .long   QDEC_IRQHandler_v
+    .long   COMP_IRQHandler_v
+    .long   SWI0_EGU0_IRQHandler_v
+    .long   SWI1_EGU1_IRQHandler_v
+    .long   SWI2_IRQHandler_v
+    .long   SWI3_IRQHandler_v
     .long   SWI4_IRQHandler
     .long   SWI5_IRQHandler
     .long   0                           /*Reserved */
     .long   0                           /*Reserved */
-    .long   PWM0_IRQHandler
-    .long   PDM_IRQHandler
+    .long   PWM0_IRQHandler_v
+    .long   PDM_IRQHandler_v
     .long   0                           /*Reserved */
     .long   0                           /*Reserved */
     .long   0                           /*Reserved */
@@ -163,81 +163,47 @@ __Vectors:
 
 /* Reset Handler */
 
-
     .text
     .thumb
     .thumb_func
     .align 1
-    .globl Reset_Handler
-    .type Reset_Handler, %function
+    .globl    Reset_Handler
+    .type    Reset_Handler, %function
 Reset_Handler:
+    .fnstart
 
 
-/* Loop to copy data from read only memory to RAM.
- * The ranges of copy from/to are specified by following symbols:
- *      __etext: LMA of start of the section to copy from. Usually end of text
- *      __data_start__: VMA of start of the section to copy to.
- *      __bss_start__: VMA of end of the section to copy to. Normally __data_end__ is used, but by using __bss_start__
- *                    the user can add their own initialized data section before BSS section with the INSERT AFTER command.
- *
- * All addresses must be aligned to 4 bytes boundary.
- */
-#ifndef __STARTUP_SKIP_ETEXT
-    ldr r1, =__etext
-    ldr r2, =__data_start__
-    ldr r3, =__bss_start__
+/*     Loop to copy data from read only memory to RAM. The ranges
+ *      of copy from/to are specified by following symbols evaluated in
+ *      linker script.
+ *      __etext: End of code section, i.e., begin of data sections to copy from.
+ *      __data_start__/__data_end__: RAM address range that data should be
+ *      copied to. Both must be aligned to 4 bytes boundary.  */
 
-    subs r3, r3, r2
-    ble .L_loop1_done
+    ldr    r1, =__etext
+    ldr    r2, =__data_start__
+    ldr    r3, =__data_end__
 
-.L_loop1:
-    subs r3, r3, #4
-    ldr r0, [r1,r3]
-    str r0, [r2,r3]
-    bgt .L_loop1
+    subs    r3, r2
+    ble     .LC0
 
-.L_loop1_done:
-#endif
+.LC1:
+    subs    r3, 4
+    ldr    r0, [r1,r3]
+    str    r0, [r2,r3]
+    bgt    .LC1
+.LC0:
 
-/* This part of work usually is done in C library startup code. Otherwise,
- * define __STARTUP_CLEAR_BSS to enable it in this startup. This section
- * clears the RAM where BSS data is located.
- *
- * The BSS section is specified by following symbols
- *    __bss_start__: start of the BSS section.
- *    __bss_end__: end of the BSS section.
- *
- * All addresses must be aligned to 4 bytes boundary.
- */
-#ifdef __STARTUP_CLEAR_BSS
-    ldr r1, =__bss_start__
-    ldr r2, =__bss_end__
-
-    movs r0, 0
-
-    subs r2, r2, r1
-    ble .L_loop3_done
-
-.L_loop3:
-    subs r2, r2, #4
-    str r0, [r1, r2]
-    bgt .L_loop3
-
-.L_loop3_done:
-#endif /* __STARTUP_CLEAR_BSS */
-
-/* Execute SystemInit function. */
-    bl SystemInit
-
-/* Call _start function provided by libraries.
- * If those libraries are not accessible, define __START as your entry point.
- */
-#ifndef __START
-#define __START _start
-#endif
-    bl __START
+    LDR     R0, =SystemInit
+    BLX     R0
+    LDR     R0, =nrf_reloc_vector_table
+    BLX     R0
+    LDR     R0, =_start
+    BX      R0
 
     .pool
+    .cantunwind
+    .fnend
     .size   Reset_Handler,.-Reset_Handler
 
     .section ".text"
@@ -248,42 +214,42 @@ Reset_Handler:
     .weak   NMI_Handler
     .type   NMI_Handler, %function
 NMI_Handler:
-    b       .
+    B       .
     .size   NMI_Handler, . - NMI_Handler
 
 
     .weak   HardFault_Handler
     .type   HardFault_Handler, %function
 HardFault_Handler:
-    b       .
+    B       .
     .size   HardFault_Handler, . - HardFault_Handler
 
 
     .weak   MemoryManagement_Handler
     .type   MemoryManagement_Handler, %function
 MemoryManagement_Handler:
-    b       .
+    B       .
     .size   MemoryManagement_Handler, . - MemoryManagement_Handler
 
 
     .weak   BusFault_Handler
     .type   BusFault_Handler, %function
 BusFault_Handler:
-    b       .
+    B       .
     .size   BusFault_Handler, . - BusFault_Handler
 
 
     .weak   UsageFault_Handler
     .type   UsageFault_Handler, %function
 UsageFault_Handler:
-    b       .
+    B       .
     .size   UsageFault_Handler, . - UsageFault_Handler
 
 
     .weak   SVC_Handler
     .type   SVC_Handler, %function
 SVC_Handler:
-    b       .
+    B       .
     .size   SVC_Handler, . - SVC_Handler
 
 
@@ -297,14 +263,14 @@ DebugMon_Handler:
     .weak   PendSV_Handler
     .type   PendSV_Handler, %function
 PendSV_Handler:
-    b       .
+    B       .
     .size   PendSV_Handler, . - PendSV_Handler
 
 
     .weak   SysTick_Handler
     .type   SysTick_Handler, %function
 SysTick_Handler:
-    b       .
+    B       .
     .size   SysTick_Handler, . - SysTick_Handler
 
 
@@ -313,7 +279,7 @@ SysTick_Handler:
     .globl  Default_Handler
     .type   Default_Handler, %function
 Default_Handler:
-    b       .
+    B       .
     .size   Default_Handler, . - Default_Handler
 
     .macro  IRQ handler
@@ -321,32 +287,32 @@ Default_Handler:
     .set    \handler, Default_Handler
     .endm
 
-    IRQ  POWER_CLOCK_IRQHandler
-    IRQ  RADIO_IRQHandler
-    IRQ  UARTE0_UART0_IRQHandler
-    IRQ  TWIM0_TWIS0_TWI0_SPIM1_SPIS1_SPI1_IRQHandler
-    IRQ  SPIM0_SPIS0_SPI0_IRQHandler
-    IRQ  GPIOTE_IRQHandler
-    IRQ  SAADC_IRQHandler
-    IRQ  TIMER0_IRQHandler
-    IRQ  TIMER1_IRQHandler
-    IRQ  TIMER2_IRQHandler
-    IRQ  RTC0_IRQHandler
-    IRQ  TEMP_IRQHandler
-    IRQ  RNG_IRQHandler
-    IRQ  ECB_IRQHandler
-    IRQ  CCM_AAR_IRQHandler
-    IRQ  WDT_IRQHandler
-    IRQ  RTC1_IRQHandler
-    IRQ  QDEC_IRQHandler
-    IRQ  COMP_IRQHandler
-    IRQ  SWI0_EGU0_IRQHandler
-    IRQ  SWI1_EGU1_IRQHandler
-    IRQ  SWI2_IRQHandler
-    IRQ  SWI3_IRQHandler
+    IRQ  POWER_CLOCK_IRQHandler                          /* restricted */
+    IRQ  RADIO_IRQHandler                                /* blocked    */
+    IRQ  UARTE0_UART0_IRQHandler_v
+    IRQ  TWIM0_TWIS0_TWI0_SPIM1_SPIS1_SPI1_IRQHandler_v
+    IRQ  SPIM0_SPIS0_SPI0_IRQHandler_v
+    IRQ  GPIOTE_IRQHandler_v
+    IRQ  SAADC_IRQHandler_v
+    IRQ  TIMER0_IRQHandler_v
+    IRQ  TIMER1_IRQHandler_v
+    IRQ  TIMER2_IRQHandler_v
+    IRQ  RTC0_IRQHandler                                 /* blocked    */
+    IRQ  TEMP_IRQHandler_v
+    IRQ  RNG_IRQHandler                                  /* restricted */
+    IRQ  ECB_IRQHandler                                  /* restricted */
+    IRQ  CCM_AAR_IRQHandler                              /* blocked    */
+    IRQ  WDT_IRQHandler_v
+    IRQ  RTC1_IRQHandler_v
+    IRQ  QDEC_IRQHandler_v
+    IRQ  COMP_IRQHandler_v
+    IRQ  SWI0_EGU0_IRQHandler_v
+    IRQ  SWI1_EGU1_IRQHandler_v
+    IRQ  SWI2_IRQHandler_v
+    IRQ  SWI3_IRQHandler_v
     IRQ  SWI4_IRQHandler
     IRQ  SWI5_IRQHandler
-    IRQ  PWM0_IRQHandler
-    IRQ  PDM_IRQHandler
+    IRQ  PWM0_IRQHandler_v
+    IRQ  PDM_IRQHandler_v
 
   .end
