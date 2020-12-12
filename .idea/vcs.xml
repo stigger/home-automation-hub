@@ -2,6 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/lib/pubsubclient" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/lib/IRremote/src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/lib/WIZnetInterface" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/lib/mbed-mqtt" vcs="Git" />
   </component>
 </project>

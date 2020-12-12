@@ -26,8 +26,7 @@
 #ifndef _CC1101_H
 #define _CC1101_H
 
-#include <SPI.h>
-#include "ccpacket.h"
+#include <mbed.h>
 
 /**
  * Type of transfers
@@ -286,13 +285,18 @@
 class CC1101
 {
   private:
+    DigitalOut CC1101_SS;
+    InterruptIn *intn;
     mbed::SPI SPI;
+    bool light;
+    uint8_t packetLength;
+    Callback<void(uint8_t[])> callback;
     void writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len);
     void readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len);
 
 public:
 
-    CC1101();
+    CC1101(bool light, PinName ss, PinName irq = NC);
 
     uint8_t cmdStrobe(uint8_t cmd);
 
@@ -306,9 +310,11 @@ public:
     
     void init();
 
-    bool sendData(const uint8_t *data, bool longPreamble);
+    bool sendData(const uint8_t *data, bool longPreamble = false);
 
-    uint8_t receiveData(CCPACKET *packet);
+    unique_ptr<uint8_t[]> receiveData();
+
+    void setCallback(Callback<void(uint8_t[])> const &callback);
 };
 
 #endif

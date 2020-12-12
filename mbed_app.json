@@ -6,6 +6,8 @@
     "*": {
       "target.lf_clock_src": "NRF_LF_SRC_SYNTH",
       "rtos.thread-stack-size": 2048,
+      "platform.minimal-printf-enable-floating-point": true,
+      "platform.minimal-printf-set-floating-point-max-decimals": 1,
       "platform.heap-stats-enabled": true,
       "events.shared-dispatch-from-application": true,
       "platform.error-filename-capture-enabled": true
