@@ -6,6 +6,13 @@
 #include "AEG1.h"
 #include "AEG2.h"
 
+#define IRMP_INPUT_PIN   p25
+#define IRMP_SUPPORT_SAMSUNG_PROTOCOL           1
+#define IRMP_USE_COMPLETE_CALLBACK       1
+#define F_INTERRUPTS                          15625
+#include "irmp.c.h"
+#include <IRTimer.cpp.h>
+
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
 WIZnetInterface net(SPI_PSELMOSI0, SPI_PSELMISO0, SPI_PSELSCK0, SPI_PSELSS0);
@@ -14,7 +21,6 @@ MQTTClient mqtt(&tcp);
 
 CC1101 cc1101_lacrosse(false, p14, p15);
 CC1101 cc2500_light(true, p12);
-//IRrecv irrecv(1);
 
 class tempStuff {
 public:
@@ -186,6 +192,10 @@ int main() {
   cc1101_lacrosse.setCallback(callback(&HandleReceivedLaCrosseData));
   aeg1.init_for_receive();
 
+  irmp_init();
+  mbed::Ticker sMbedTimer;
+  sMbedTimer.attach(irmp_ISR, std::chrono::microseconds(1000000 / F_INTERRUPTS));
+
   MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
   data.clientID.cstring = (char *) "arduinoClient";
 
@@ -212,13 +222,19 @@ int main() {
         mqtt.yield(1); // keepalive
       }
   });
-  q->dispatch_forever();
 
-//  if (irrecv.decode(&results)) {
-//    if (mqttClient.connected()) {
-//      String value(results.value, 16);
-//      mqttClient.publish("ir_sensor", value.c_str());
-//    }
-//    irrecv.resume();
-//  }
+  irmp_register_complete_callback_function([]{
+      mbed_event_queue()->call([]{
+          IRMP_DATA irmp_data;
+          if (irmp_get_data(&irmp_data) && mqtt.isConnected()) {
+            MQTT::Message msg = {};
+            char buf[20];
+            msg.payloadlen = snprintf(buf, sizeof(buf), "%0x%0x", irmp_data.address, irmp_data.command);
+            msg.payload = buf;
+            mqtt.publish("ir_sensor", msg);
+          }
+      });
+  });
+
+  q->dispatch_forever();
 }
