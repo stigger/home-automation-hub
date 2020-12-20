@@ -11,7 +11,6 @@
 #define IRMP_USE_COMPLETE_CALLBACK       1
 #define F_INTERRUPTS                          15625
 #include "irmp.c.h"
-#include <IRTimer.cpp.h>
 
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
@@ -36,35 +35,56 @@ const uint8_t on[16] {0x0e, 0x68, 0x04, 0x1f, 0x46, 0x01, 0xa7, 0x00, 0x00, 0x00
 AEG1 aeg1;
 AEG2 aeg2;
 
+std::unique_ptr<Thread> spawn(Kernel::Clock::duration_u32 delay, void (*f)()) {
+  std::unique_ptr<Thread> t(new Thread());
+  t->start([&delay, f]{
+      ThisThread::sleep_for(delay);
+      f();
+  });
+  return t;
+}
+
+void updateLights(uint8_t data) {
+  NRF_RADIO->INTENCLR = RADIO_INTENCLR_END_Clear << RADIO_INTENCLR_END_Pos;
+  unique_ptr<Thread> t1, t2, t3;
+  if ((prev_lights_state & 0b001u) != (data & 0b001u)) {
+    if (data & 0b01) {
+      t1 = spawn(0ms, [] { aeg1.on(); });
+    }
+    else {
+      t1 = spawn(0ms, [] { aeg1.off(); });
+    }
+  }
+  if (t1) t1->join();
+  if ((prev_lights_state & 0b010u) != (data & 0b010u)) {
+    if (data & 0b10) {
+      t2 = spawn(82ms, [] { aeg2.on(); });
+    }
+    else {
+      t2 = spawn(314ms, [] { aeg2.off(); });
+    }
+  }
+  if ((prev_lights_state & 0b100u) != (data & 0b100u)) {
+    if ((data & 0b100u) != 0) {
+      t3 = spawn(133ms, [] { cc2500_light.sendData(on); });
+    }
+    else {
+      t3 = spawn(308ms, [] { cc2500_light.sendData(off); });
+    }
+  }
+  if (t2) t2->join();
+  if (t3) t3->join();
+
+  aeg1.init_for_receive();
+  prev_lights_state = data;
+}
+
 void messageArrived(MQTT::MessageData &md) {
   MQTT::Message &message = md.message;
   if (message.payloadlen == 1) {
     uint8_t data = ((uint8_t*)message.payload)[0];
-    NRF_RADIO->TASKS_STOP = 1;
-    NRF_RADIO->INTENCLR = RADIO_INTENCLR_END_Clear << RADIO_INTENCLR_END_Pos;
-    if ((prev_lights_state & 0b001u) != (data & 0b001u)) {
-      if (data & 0b01) {
-        aeg1.on();
-      } else {
-        aeg1.off();
-      }
-    }
-    if ((prev_lights_state & 0b010u) != (data & 0b010u)) {
-      if (data & 0b10) {
-        aeg2.on();
-      } else {
-        aeg2.off();
-      }
-    }
-    if ((prev_lights_state & 0b100u) != (data & 0b100u)) {
-      for (int i = 0; i < 5; i++) {
-        cc2500_light.sendData((data & 0b100u) != 0 ? on : off);
-        ThisThread::sleep_for(30ms);
-      }
-    }
-
-    aeg1.init_for_receive();
-    prev_lights_state = data;
+    NRF_RADIO->TASKS_STOP = 1; //todo test commenting out
+    updateLights(data);
   }
 }
 
@@ -135,19 +155,18 @@ void HandleReceivedLaCrosseData(uint8_t payload[]) {
 
 extern "C" {
 void RADIO_IRQHandler() {
-  mbed_event_queue()->call([]() {
+  mbed_event_queue()->call([] {
       uint8_t i = aeg1.receive();
       if (i != 0xff) {
-        NRF_RADIO->INTENCLR = RADIO_INTENCLR_END_Clear << RADIO_INTENCLR_END_Pos;
-        ThisThread::sleep_for(100ms);
+        // todo hangs on using AEG remote
         switch (i) {
           case 0xf0:
-            aeg2.off();
-            cc2500_light.sendData(off);
+            prev_lights_state &= 0xfe;
+            updateLights(0b000);
             break;
           case 0x30:
-            aeg2.on();
-            cc2500_light.sendData(on);
+            prev_lights_state |= 1;
+            updateLights(0b111);
             break;
           case 0xa0:
             aeg2.brightness_up(false);
@@ -164,14 +183,16 @@ void RADIO_IRQHandler() {
           default:;
         }
       }
-      aeg1.init_for_receive();
+      if (i != 0xf0 && i != 0x30) {
+        aeg1.init_for_receive();
+      }
   });
   NRF_RADIO->EVENTS_END = 0;
 }
 }
 
 int main() {
-  ThisThread::sleep_for(3s);// on power up W5500 needs to initialize or something
+  ThisThread::sleep_for(2s);// on power up W5500 needs to initialize or something
 
   NVIC_ClearPendingIRQ(RADIO_IRQn);
   NVIC_EnableIRQ(RADIO_IRQn);

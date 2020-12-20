@@ -270,21 +270,13 @@ bool CC1101::sendData(const uint8_t *data, bool longPreamble)
 
   cmdStrobe(CC1101_STX);
 
-//  for (size_t i = 0; i < 200; i++) {
-//    if (readStatusReg(CC1101_MARCSTATE) == MARCSTATE_RX) {
-//      break;
-//    }
-//    if (readStatusReg(CC1101_MARCSTATE) != MARCSTATE_TX) {
-//      break;
-//    }
-//    delay(1);
-//  }
-//
-//  if (readStatusReg(CC1101_MARCSTATE) != MARCSTATE_RX) {
-//    Serial.println("cc1101 error3");
-//    init();
-//    return false;
-//  }
+  for (size_t i = 0; i < 200; i++) {
+    uint8_t state = readStatusReg(CC1101_MARCSTATE);
+    if (state != MARCSTATE_TX) {
+      break;
+    }
+    ThisThread::sleep_for(1ms);
+  }
 
   return true;
 }
