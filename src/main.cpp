@@ -5,6 +5,7 @@
 #include "cc1101.h"
 #include "AEG1.h"
 #include "AEG2.h"
+#include "OSRAM.h"
 
 #define IRMP_INPUT_PIN   p25
 #define IRMP_SUPPORT_SAMSUNG_PROTOCOL           1
@@ -34,6 +35,7 @@ const uint8_t on[16] {0x0e, 0x68, 0x04, 0x1f, 0x46, 0x01, 0xa7, 0x00, 0x00, 0x00
 
 AEG1 aeg1;
 AEG2 aeg2;
+OSRAM osram;
 
 std::unique_ptr<Thread> spawn(Kernel::Clock::duration_u32 delay, void (*f)()) {
   std::unique_ptr<Thread> t(new Thread());
@@ -46,7 +48,7 @@ std::unique_ptr<Thread> spawn(Kernel::Clock::duration_u32 delay, void (*f)()) {
 
 void updateLights(uint8_t data) {
   NRF_RADIO->INTENCLR = RADIO_INTENCLR_END_Clear << RADIO_INTENCLR_END_Pos;
-  unique_ptr<Thread> t1, t2, t3;
+  unique_ptr<Thread> t1, t2, t3, t4;
   if ((prev_lights_state & 0b001u) != (data & 0b001u)) {
     if (data & 0b01) {
       t1 = spawn(0ms, [] { aeg1.on(); });
@@ -66,14 +68,33 @@ void updateLights(uint8_t data) {
   }
   if ((prev_lights_state & 0b100u) != (data & 0b100u)) {
     if ((data & 0b100u) != 0) {
-      t3 = spawn(133ms, [] { cc2500_light.sendData(on); });
+      t3 = spawn(133ms, [] {
+          for (int i = 0; i < 3; i++) {
+            cc2500_light.sendData(on);
+            ThisThread::sleep_for(10ms);
+          }
+      });
     }
     else {
-      t3 = spawn(308ms, [] { cc2500_light.sendData(off); });
+      t3 = spawn(308ms, [] {
+          for (int i = 0; i < 3; i++) {
+            cc2500_light.sendData(off);
+            ThisThread::sleep_for(10ms);
+          }
+      });
     }
   }
   if (t2) t2->join();
+  if ((prev_lights_state & 0b1000u) != (data & 0b1000u)) {
+    if (data & 0b1000) {
+      t4 = spawn(0ms, [] { osram.on(); });
+    }
+    else {
+      t4 = spawn(0ms, [] { osram.off(); });
+    }
+  }
   if (t3) t3->join();
+  if (t4) t4->join();
 
   aeg1.init_for_receive();
   prev_lights_state = data;

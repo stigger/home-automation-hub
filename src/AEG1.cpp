@@ -91,7 +91,7 @@ void AEG1::radio_init() {
 }
 
 void AEG1::send(int length, int delayMs) {
-  AEG::send(length, delayMs);
+  AEG::send(length, delayMs * 1000);
 }
 
 void AEG1::next() {

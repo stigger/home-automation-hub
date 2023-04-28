@@ -12,7 +12,7 @@ protected:
     virtual void next() = 0;
     virtual void radio_init() = 0;
 
-    virtual void send(int length, int delayMs);
+    virtual void send(int length, int delayUs);
 };
 
 

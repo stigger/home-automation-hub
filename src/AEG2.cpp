@@ -39,7 +39,7 @@ void AEG2::send(int length, int delayMs) {
   c1 = 0;
   c2 = 0;
   packet[53] = 0;
-  AEG::send(length, delayMs);
+  AEG::send(length, delayMs * 1000);
 }
 
 void AEG2::radio_init() {
