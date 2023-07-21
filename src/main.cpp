@@ -39,7 +39,7 @@ OSRAM osram;
 
 std::unique_ptr<Thread> spawn(Kernel::Clock::duration_u32 delay, void (*f)()) {
   std::unique_ptr<Thread> t(new Thread());
-  t->start([&delay, f]{
+  t->start([delay, f]{
       ThisThread::sleep_for(delay);
       f();
   });
