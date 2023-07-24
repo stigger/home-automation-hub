@@ -11,7 +11,8 @@
 #define IRMP_SUPPORT_SAMSUNG_PROTOCOL           1
 #define IRMP_USE_COMPLETE_CALLBACK       1
 #define F_INTERRUPTS                          15625
-#include "irmp.c.h"
+#include "irmp.hpp"
+#include "irmpPinChangeInterrupt.hpp"
 
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
@@ -109,7 +110,6 @@ void messageArrived(MQTT::MessageData &md) {
   }
 }
 
-//decode_results results;
 tempStuff sensors[5];
 
 MQTT::Message& fillMsg(MQTT::Message &msg, string &s) {
@@ -235,8 +235,9 @@ int main() {
   aeg1.init_for_receive();
 
   irmp_init();
-  mbed::Ticker sMbedTimer;
-  sMbedTimer.attach(irmp_ISR, std::chrono::microseconds(1000000 / F_INTERRUPTS));
+  InterruptIn irmpPin(IRMP_PIN);
+  irmpPin.rise(callback(&irmp_PCI_ISR));
+  irmpPin.fall(callback(&irmp_PCI_ISR));
 
   MQTTPacket_connectData data = MQTTPacket_connectData_initializer;
   data.clientID.cstring = (char *) "arduinoClient";
