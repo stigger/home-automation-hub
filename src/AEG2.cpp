@@ -69,7 +69,7 @@ void AEG2::next() {
   c1 &= 0b00111111u;
   packet[54] = c1 << 2u | 0b01u;
   packet[55] = c2;
-  uint16_t crc = crc16(0, packet + 47, sizeof(packet) - 2 - 47);
+  uint16_t crc = crc16_light(0, packet + 47, sizeof(packet) - 2 - 47);
   packet[61] = crc >> 8u;
   packet[62] = crc & 0xff;
   c1++;

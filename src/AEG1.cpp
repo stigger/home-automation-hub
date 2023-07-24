@@ -62,7 +62,7 @@ void AEG1::switch_color() {
 }
 
 uint8_t AEG1::receive() {
-  uint16_t crc = crc16(0x8cfe, rcv_packet, sizeof(rcv_packet) - 2);
+  uint16_t crc = crc16_light(0x8cfe, rcv_packet, sizeof(rcv_packet) - 2);
   if (crc == (rcv_packet[16] << 8u | rcv_packet[17])) {
     return rcv_packet[11];
   }
@@ -121,7 +121,7 @@ void AEG1::next() {
   }
   packet[14] = f1 << 5u | f2 << 2u | f3;
   packet[15] = r1 << 7u | r2 << 4u | r3 << 2u | r4;
-  uint16_t crc = crc16(0x8cfe, packet, sizeof(packet) - 2);
+  uint16_t crc = crc16_light(0x8cfe, packet, sizeof(packet) - 2);
   packet[16] = crc >> 8u;
   packet[17] = crc & 0xff;
 }

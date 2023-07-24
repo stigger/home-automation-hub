@@ -13,6 +13,7 @@
 #define F_INTERRUPTS                          15625
 #include "irmp.hpp"
 #include "irmpPinChangeInterrupt.hpp"
+#include "wmBusManager.h"
 
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x0D, 0xCA, 0x21};
 
@@ -20,8 +21,11 @@ WIZnetInterface net(SPI_PSELMOSI0, SPI_PSELMISO0, SPI_PSELSCK0, SPI_PSELSS0);
 TCPSocket tcp; // mosquitto doesn't support UDP
 MQTTClient mqtt(&tcp);
 
-CC1101 cc1101_lacrosse(false, p14, p15);
-CC1101 cc2500_light(true, p12);
+void HandleReceived1101(uint16_t len, std::shared_ptr<uint8_t[]> payload);
+
+CC1101 cc1101(CC1101::wMBus, p14, p15, callback(&HandleReceived1101));
+CC1101 cc2500_light(CC1101::Light, p12);
+wmBus::Manager wmbus(cc1101, mqtt);
 
 class tempStuff {
 public:
@@ -120,7 +124,6 @@ MQTT::Message& fillMsg(MQTT::Message &msg, string &s) {
 
 void HandleReceivedLaCrosseData(uint8_t payload[]) {
   struct LaCrosse::Frame frame {};
-  MQTT::Message msg = {};
   LaCrosse::DecodeFrame(payload, &frame);
   if (frame.IsValid) {
     tempStuff *stuff = nullptr;
@@ -134,24 +137,23 @@ void HandleReceivedLaCrosseData(uint8_t payload[]) {
     if (stuff != nullptr) {
       if (stuff->lastTemp == -1 || fabs(stuff->lastTemp - frame.Temperature) < 5) {
         stuff->lastTemp = frame.Temperature;
-
-        if (mqtt.isConnected()) {
-          string topic("lacrosse/");
-          topic += to_string(frame.ID);
-          {
-            char buf[20];
-            msg.payload = buf;
-            msg.payloadlen = snprintf(buf, sizeof(buf), "%f", frame.Temperature);
-            mqtt.publish((topic + "/temperature").c_str(), msg);
+        mbed_event_queue()->call([frame]{
+          if (mqtt.isConnected()) {
+            MQTT::Message msg = {};
+            string topic("lacrosse/");
+            topic += to_string(frame.ID);
+            {
+              char buf[20];
+              msg.payload = buf;
+              msg.payloadlen = snprintf(buf, sizeof(buf), "%f", frame.Temperature);
+              mqtt.publish((topic + "/temperature").c_str(), msg);
+            }
+            {
+              string str = to_string(frame.Humidity);
+              mqtt.publish((topic + "/humidity").c_str(), fillMsg(msg, str));
+            }
           }
-          {
-            string str = to_string(frame.Humidity);
-            mqtt.publish((topic + "/humidity").c_str(), fillMsg(msg, str));
-          }
-          msg.payload = (void*) (frame.WeakBatteryFlag ? "1" : "0");
-          msg.payloadlen = 1;
-          mqtt.publish((topic + "/weak_battery").c_str(), msg);
-        }
+        });
       }
     }
   }
@@ -163,14 +165,26 @@ void HandleReceivedLaCrosseData(uint8_t payload[]) {
 
       short co2 = ((short) payload[2] << 8u) + (short)payload[3]; // NOLINT(cppcoreguidelines-narrowing-conversions)
 
-      if (mqtt.isConnected()) {
-        string topic("custom/");
-        topic += to_string(id);
-        topic += "/co2";
-        string s = to_string(co2);
-        mqtt.publish(topic.c_str(), fillMsg(msg, s));
-      }
+      mbed_event_queue()->call([id, co2]{
+        if (mqtt.isConnected()) {
+          MQTT::Message msg = {};
+          string topic("custom/");
+          topic += to_string(id);
+          topic += "/co2";
+          string s = to_string(co2);
+          mqtt.publish(topic.c_str(), fillMsg(msg, s));
+        }
+      });
     }
+  }
+}
+
+void HandleReceived1101(uint16_t len, std::shared_ptr<uint8_t[]> payload) { // NOLINT(performance-unnecessary-value-param)
+  if (cc1101.getMode() == CC1101::wMBus) {
+    wmbus.receiveBytes(len, payload.get());
+  }
+  else {
+    HandleReceivedLaCrosseData(payload.get());
   }
 }
 
@@ -230,8 +244,6 @@ int main() {
   srand(NRF_RNG->VALUE);
 
   net.init(mac, "192.168.132.3", "255.255.255.0", "127.0.0.1");
-
-  cc1101_lacrosse.setCallback(callback(&HandleReceivedLaCrosseData));
   aeg1.init_for_receive();
 
   irmp_init();

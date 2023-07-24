@@ -25,9 +25,14 @@
 
 #include "cc1101.h"
 #include <mbed.h>
+#include <vector>
 
 #define cc1101_Select()  CC1101_SS = 0
 #define cc1101_Deselect()  CC1101_SS = 1
+
+#define LONG_PACKET_CHUNK_SIZE 60
+#define LONG_PACKET_SIZE_THRESHOLD 64
+#define LONG_PACKET_FIFO_THRESHOLD         0x0e
 
 const uint8_t LACROSSE_CFG[59] = {
         CC1101_FSCTRL1, 0x06,
@@ -116,17 +121,65 @@ const uint8_t LIGHT_CFG[89] = {
         0xff
 };
 
-CC1101::CC1101(bool light, PinName ss, PinName irq): CC1101_SS(ss), SPI(SPI_PSELMOSI1, SPI_PSELMISO1, SPI_PSELSCK1), light(light)
+const uint8_t WMBUS_TMODE_CFG[79] = {
+        CC1101_SYNC1, 0x54,
+        CC1101_SYNC0, 0x3D,
+        CC1101_MCSM1, 0x00,
+
+        CC1101_IOCFG2, 0x06,   // IOCFG2  GDO2 output pin configuration.
+        CC1101_IOCFG0, 0x00,   // IOCFG0  GDO0 output pin configuration.
+
+        CC1101_FSCTRL1, 0x08,   // FSCTRL1   Frequency synthesizer control.
+        CC1101_FSCTRL0, 0x00,   // FSCTRL0   Frequency synthesizer control.
+        CC1101_FREQ2, 0x21,   // FREQ2     Frequency control word, high byte.
+        CC1101_FREQ1, 0x6B,   // FREQ1     Frequency control word, middle byte.
+        CC1101_FREQ0, 0xD0,   // FREQ0     Frequency control word, low byte.
+        CC1101_MDMCFG4, 0x5C,   // MDMCFG4   Modem configuration.  - 103 kBaud
+        CC1101_MDMCFG3, 0x04,   // MDMCFG3   Modem configuration.
+        CC1101_MDMCFG2, 0x06,   // !! 05 !! MDMCFG2 Modem configuration.
+        CC1101_MDMCFG1, 0x22,   // MDMCFG1   Modem configuration.
+        CC1101_MDMCFG0, 0xF8,   // MDMCFG0   Modem configuration.
+        CC1101_CHANNR, 0x00,   // CHANNR    Channel number.
+        CC1101_DEVIATN, 0x44,   // DEVIATN   Modem deviation setting (when FSK modulation is enabled).
+        CC1101_FREND1, 0xB6,   // FREND1    Front end RX configuration.
+        CC1101_FREND0, 0x10,   // FREND0    Front end RX configuration.
+        CC1101_MCSM0, 0x18,   // MCSM0     Main Radio Control State Machine configuration.
+        CC1101_FOCCFG, 0x2E,   // FOCCFG    Frequency Offset Compensation Configuration.
+        CC1101_BSCFG, 0xBF,   // BSCFG     Bit synchronization Configuration.
+        CC1101_AGCCTRL2, 0x43,   // AGCCTRL2  AGC control.
+        CC1101_AGCCTRL1, 0x09,   // AGCCTRL1  AGC control.
+        CC1101_AGCCTRL0, 0xB5,   // AGCCTRL0  AGC control.
+        CC1101_FSCAL3, 0xEA,   // FSCAL3    Frequency synthesizer calibration.
+        CC1101_FSCAL2, 0x2A,   // FSCAL2    Frequency synthesizer calibration.
+        CC1101_FSCAL1, 0x00,   // FSCAL1    Frequency synthesizer calibration.
+        CC1101_FSCAL0, 0x1F,   // FSCAL0    Frequency synthesizer calibration.
+        CC1101_FSTEST, 0x59,   // FSTEST    Frequency synthesizer calibration.
+        CC1101_TEST2, 0x81,   // TEST2     Various test settings.
+        CC1101_TEST1, 0x35,   // TEST1     Various test settings.
+        CC1101_TEST0, 0x09,   // TEST0     Various test settings.
+        CC1101_PKTCTRL1, 0x00,   // !! 00 !! PKTCTRL1  Packet automation control.
+        CC1101_PKTCTRL0, 0x00,   // PKTCTRL0  Packet automation control.
+        CC1101_ADDR, 0x00,   // ADDR      Device address.
+        CC1101_PKTLEN, 0xFF,    // PKTLEN    Packet length.
+
+        CC1101_PATABLE, 0xC2,  // PATABLE
+        0xff
+};
+
+CC1101::CC1101(Mode mode, PinName ss, PinName irq, Callback<void(uint16_t, std::shared_ptr<uint8_t[]>)> dataHandler): CC1101_SS(ss), SPI(p20, p16, p18), mode(mode), dataHandler(dataHandler)
 {
-  packetLength = light ? 16 : 5;
+  queue = mbed_highprio_event_queue();
   init();
   if (irq != NC) {
     intn = new InterruptIn(irq);
     intn->rise([this] {
-        mbed_event_queue()->call([this] {
-            unique_ptr<uint8_t[]> ptr = receiveData();
-            if (ptr != nullptr) {
-              callback(ptr.get());
+        if (this->dataHandler == nullptr || canceled) return;
+
+        queue->call([this] {
+            while (intn->read()) {
+              auto [len, data] = receiveData();
+              std::shared_ptr<uint8_t[]> data_ptr = std::move(data);
+              this->dataHandler(len, data_ptr);
             }
         });
     });
@@ -206,17 +259,26 @@ void CC1101::reset()
 
   cc1101_Deselect();                    // Deselect CC1101
 
-  setCCregs();                          // Reconfigure CC1101
+  ThisThread::sleep_for(1ms);
+  setCCregs(mode);                          // Reconfigure CC1101
   cmdStrobe(CC1101_SCAL);
-  ThisThread::sleep_for(4ms);
+
+  setPacketLength(mode == Light ? 16 : mode == LaCrosse ? 5 : 3);
+  resetRxMode();
+}
+
+void CC1101::resetRxMode() {
   cmdStrobe(CC1101_SIDLE);
   cmdStrobe(CC1101_SFRX);
   cmdStrobe(CC1101_SRX);
+
+  longPacket = false;
+  canceled = false;
 }
 
-void CC1101::setCCregs()
+void CC1101::setCCregs(Mode _mode)
 {
-  auto cfg = light ? LIGHT_CFG : LACROSSE_CFG;
+  auto cfg = _mode == Light ? LIGHT_CFG : _mode == LaCrosse ? LACROSSE_CFG : WMBUS_TMODE_CFG;
 
   for (uint8_t i = 0; i<90; i += 2) {
     if (cfg[i] > 0x40)
@@ -225,9 +287,22 @@ void CC1101::setCCregs()
   }
 }
 
+void CC1101::setMode(Mode _mode) {
+  mode = None;
+  setCCregs(_mode);
+  setPacketLength(_mode == wMBus ? 3 : 5);
+  resetRxMode();
+  mode = _mode;
+}
+
+CC1101::Mode CC1101::getMode() {
+  return mode;
+}
+
 void CC1101::init()
 {
   SPI.format(8);                          // Initialize SPI interface
+  SPI.frequency(4000000);
   reset();                              // Reset CC1101
 }
 
@@ -281,17 +356,79 @@ bool CC1101::sendData(const uint8_t *data, bool longPreamble)
   return true;
 }
 
-unique_ptr<uint8_t[]> CC1101::receiveData() {
-  uint8_t length = readReg(CC1101_RXBYTES, CC1101_STATUS_REGISTER) & 0x7f;
-  if (length == packetLength) {
-    unique_ptr<uint8_t[]> packet(new uint8_t[length]);
-    readBurstReg(packet.get(), CC1101_RXFIFO, length);
+unique_ptr<uint8_t[]> CC1101::readBytes(int len) {
+  unique_ptr<uint8_t[]> packet(new uint8_t[len]);
+  readBurstReg(packet.get(), CC1101_RXFIFO, len);
+  if (mode != wMBus) {
     cmdStrobe(CC1101_SRX);
-    return packet;
   }
-  return nullptr;
+  return packet;
 }
 
-void CC1101::setCallback(Callback<void(uint8_t[])> const &callback_) {
-  CC1101::callback = callback_;
+tuple<uint16_t, unique_ptr<uint8_t[]>> CC1101::receiveData() {
+  int len = longPacket ? (LONG_PACKET_CHUNK_SIZE - 1) : longPacketPending > 0 ? longPacketPending : packetLength;
+  unique_ptr<uint8_t[]> packet = readBytes(len);
+  if (longPacket) {
+    longPacketPending -= len;
+    if (longPacketPending < len) {
+      schedulePacketEndCheck(false);
+    }
+  }
+  return {len, std::move(packet)};
+}
+
+void CC1101::schedulePacketEndCheck(bool later) {
+  if (later) {
+    queue->call_in(1ms, callback(this, &CC1101::checkPacketEnd));
+  }
+  else {
+    queue->call(callback(this, &CC1101::checkPacketEnd));
+  }
+}
+
+void CC1101::checkPacketEnd() {
+  uint8_t i = readStatusReg(CC1101_PKTSTATUS);
+  bool gdo2 = (i & 1 << 2) != 0;
+  if (gdo2) {
+    schedulePacketEndCheck(true);
+  }
+  else {
+    std::shared_ptr<uint8_t[]> data_ptr = readBytes(longPacketPending);
+    dataHandler(longPacketPending, data_ptr);
+    packetEventsCounter++;
+    setPacketLength(3);
+    resetRxMode();
+  }
+}
+
+void CC1101::setPacketLength(uint8_t _packetLength, uint8_t alreadyReceived) {
+  packetLength = _packetLength;
+  longPacketPending = packetLength - alreadyReceived;
+
+  if (packetLength < LONG_PACKET_SIZE_THRESHOLD) {
+    if (alreadyReceived == 0) {
+      writeReg(CC1101_FIFOTHR, packetLength == 3 ? 0x00 : 0x02);
+    }
+    else {
+      writeReg(CC1101_FIFOTHR, 0x0f);
+      schedulePacketEndCheck(true);
+    }
+  }
+  else {
+    writeReg(CC1101_PKTLEN, packetLength);
+    writeReg(CC1101_FIFOTHR, LONG_PACKET_FIFO_THRESHOLD);
+    longPacket = true;
+  }
+
+  if (alreadyReceived != 0) {
+    uint8_t c = ++packetEventsCounter;
+    mbed_event_queue()->call_in(30ms, [c, this] {
+      if (c == packetEventsCounter) {
+        canceled = true;
+        dataHandler(0, nullptr);
+        setPacketLength(3);
+        resetRxMode();
+      }
+    });
+  }
 }

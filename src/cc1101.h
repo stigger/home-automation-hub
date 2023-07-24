@@ -284,19 +284,27 @@
 
 class CC1101
 {
+  public:
+    enum Mode {
+        None,
+        LaCrosse,
+        Light,
+        wMBus,
+    };
+
   private:
     DigitalOut CC1101_SS;
     InterruptIn *intn;
     mbed::SPI SPI;
-    bool light;
-    uint8_t packetLength;
-    Callback<void(uint8_t[])> callback;
+    Mode mode;
+    bool longPacket{}, canceled{};
+    uint8_t packetLength{}, longPacketPending{};
+    Callback<void(uint16_t, std::shared_ptr<uint8_t[]>)> dataHandler;
     void writeBurstReg(uint8_t regAddr, const uint8_t* buffer, uint8_t len);
-    void readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len);
-
+    EventQueue *queue;
+    uint8_t packetEventsCounter{};
 public:
-
-    CC1101(bool light, PinName ss, PinName irq = NC);
+    CC1101(Mode mode, PinName ss, PinName irq = NC, Callback<void(uint16_t, std::shared_ptr<uint8_t[]>)> = nullptr);
 
     uint8_t cmdStrobe(uint8_t cmd);
 
@@ -304,7 +312,7 @@ public:
 
     void writeReg(uint8_t regAddr, uint8_t value);
 
-    void setCCregs();
+    void setCCregs(Mode _mode);
 
     void reset();
     
@@ -312,9 +320,21 @@ public:
 
     bool sendData(const uint8_t *data, bool longPreamble = false);
 
-    unique_ptr<uint8_t[]> receiveData();
+    tuple<uint16_t,unique_ptr<uint8_t[]>> receiveData();
+    void readBurstReg(uint8_t * buffer, uint8_t regAddr, uint8_t len);
 
-    void setCallback(Callback<void(uint8_t[])> const &callback);
+    void setMode(Mode mode);
+    Mode getMode();
+
+    void resetRxMode();
+
+    void setPacketLength(uint8_t packetLength, uint8_t alreadyReceived = 0);
+
+    void checkPacketEnd();
+
+    void schedulePacketEndCheck(bool later);
+
+    unique_ptr<uint8_t[]> readBytes(int len);
 };
 
 #endif

@@ -5,11 +5,11 @@
   "target_overrides": {
     "*": {
       "target.lf_clock_src": "NRF_LF_SRC_SYNTH",
-      "rtos.thread-stack-size": 1536,
+      "rtos.thread-stack-size": 512,
       "platform.minimal-printf-enable-floating-point": true,
       "platform.minimal-printf-set-floating-point-max-decimals": 1,
       "events.shared-dispatch-from-application": true,
-      "platform.stdio-flush-at-exit": false
+      "platform.stdio-baud-rate": 115200
     }
   }
 }
